@@ -1,6 +1,6 @@
 ############################################################################
 #
-#   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+#   Copyright (c) 2016 PX4 Development Team. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,44 +30,46 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 ############################################################################
+if("${PX4_BOARD_LABEL}" STREQUAL  "bootloader")
+	add_compile_definitions(BOOTLOADER)
+	add_library(drivers_board
+		bootloader_main.c
+		init.c
+		usb.c
+		timer_config.cpp
+	)
+	target_link_libraries(drivers_board
+		PRIVATE
+			nuttx_arch # sdio
+			nuttx_drivers # sdio
+			px4_layer #gpio
+			arch_io_pins # iotimer
+			bootloader
+	)
+	target_include_directories(drivers_board PRIVATE ${PX4_SOURCE_DIR}/platforms/nuttx/src/bootloader/common)
 
-set(SRCS)
+else()
+	add_library(drivers_board
+		can.c
+		i2c.cpp
+		init.c
+		led.c
+		mtd.cpp
+		sdio.c
+		spi.cpp
+		timer_config.cpp
+		usb.c
+	)
+	add_dependencies(drivers_board arch_board_hw_info)
 
-if(NOT "${PX4_PLATFORM}" MATCHES "qurt" AND NOT "${PX4_PLATFORM}" MATCHES "ros2" AND NOT "${PX4_BOARD}" MATCHES "io-v2" AND NOT "${PX4_BOARD_LABEL}" MATCHES "bootloader")
-	list(APPEND SRCS
-		px4_log.cpp
-		px4_log_history.cpp
+	target_link_libraries(drivers_board
+		PRIVATE
+			arch_io_pins
+			arch_spi
+			arch_board_hw_info
+			drivers__led # drv_led_start
+			nuttx_arch # sdio
+			nuttx_drivers # sdio
+			px4_layer
 	)
 endif()
-
-add_library(px4_platform STATIC
-	board_common.c
-	board_identity.c
-	external_reset_lockout.cpp
-	i2c.cpp
-	i2c_spi_buses.cpp
-	module.cpp
-	px4_getopt.c
-	px4_cli.cpp
-	shutdown.cpp
-	spi.cpp
-	pab_manifest.c
-	Serial.cpp
-	${SRCS}
-)
-target_link_libraries(px4_platform prebuild_targets px4_work_queue)
-
-if(NOT "${PX4_BOARD}" MATCHES "io-v2")
-	add_subdirectory(uORB)
-endif()
-
-add_subdirectory(px4_work_queue)
-add_subdirectory(work_queue)
-
-# if("${PX4_PLATFORM}" MATCHES "nuttx")
-# 	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/c_cpp_properties.json.nuttx.in ${PX4_SOURCE_DIR}/.vscode/c_cpp_properties.json @ONLY)
-# else()
-# 	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/c_cpp_properties.json.in ${PX4_SOURCE_DIR}/.vscode/c_cpp_properties.json @ONLY)
-# endif()
-
-px4_add_unit_gtest(SRC board_identity_test.cpp LINKLIBS px4_platform)
